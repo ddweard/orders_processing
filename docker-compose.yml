@@ -26,11 +26,11 @@ services:
       - mysql-data:/var/lib/mysql
       - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${MYSQL_ROOT_PASSWORD}"]
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 30s
+      start_period: 60s
     networks:
       - order-net
 
@@ -57,6 +57,7 @@ services:
   # ---------- Kafka (KRaft, без Zookeeper) ----------
   kafka:
     image: confluentinc/cp-kafka:7.6.1
+    platform: linux/amd64
     container_name: kafka
     restart: unless-stopped
     ports:
@@ -78,31 +79,28 @@ services:
     volumes:
       - kafka-data:/var/lib/kafka/data
     healthcheck:
-      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list >/dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "/usr/bin/kafka-topics --bootstrap-server localhost:9092 --list >/dev/null 2>&1 || exit 1"]
       interval: 10s
       timeout: 10s
       retries: 15
-      start_period: 40s
+      start_period: 60s
     networks:
       - order-net
 
   # ---------- kafka-init: создаёт топик order-events с 3 партициями ----------
   kafka-init:
     image: confluentinc/cp-kafka:7.6.1
+    platform: linux/amd64
     container_name: kafka-init
     depends_on:
       kafka:
         condition: service_healthy
     entrypoint: ["/bin/sh", "-c"]
-    command: >
-      "
-      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists
-        --topic ${KAFKA_TOPIC}
-        --partitions ${KAFKA_PARTITIONS}
-        --replication-factor 1 &&
-      echo 'Topic ${KAFKA_TOPIC} created/verified' &&
-      kafka-topics --bootstrap-server kafka:9092 --describe --topic ${KAFKA_TOPIC}
-      "
+    command:
+      - |
+        /usr/bin/kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic ${KAFKA_TOPIC} --partitions ${KAFKA_PARTITIONS} --replication-factor 1
+        echo "Topic ${KAFKA_TOPIC} created/verified"
+        /usr/bin/kafka-topics --bootstrap-server kafka:9092 --describe --topic ${KAFKA_TOPIC}
     networks:
       - order-net
 
