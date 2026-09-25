@@ -63,6 +63,5 @@ def main():
     finally:
         conn.close()
 
-if
-        == "__main__":
+if __name__ == "__main__":
     main()
